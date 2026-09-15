@@ -1,0 +1,180 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04a252accaf744c409dcb344dcfb19b3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  radius: 900
+  maxCloudAngleDeg: 15
+  atlasCols: 2
+  atlasRows: 4
+  atlasPath: Assets/Scene/Tex/CloudPacked.png
+  useShells: 1
+  shellRadiusNear: 380
+  shellRadiusMid: 640
+  shellRadiusFar: 900
+  coverageMaskPath: Assets/Scene/Tex/SkyCoverageMask.png
+  coverageMaskStrength: 1
+  objectName: SkyCloudsHigh
+  meshPath: Assets/Scene/Models/CloudDomeHigh.asset
+  materialPath: Assets/Scene/Mat/CloudBillboard.mat
+  sortingOrder: -2
+  clouds:
+  - enabled: 1
+    azimuthDeg: 84.29845
+    elevationDeg: 74.160614
+    size: 115.942085
+    widthAspect: 1.7777778
+    rollDeg: 1.2296143
+    mirror: 1
+    cellX: 0
+    cellY: 1
+    depth01: 0.5
+    brightHash: 0.75014365
+    dissolveSeed: 0.4198515
+    puffCount: 2
+    puffSpread: 0.65
+    puffVariance: 0.4
+  - enabled: 1
+    azimuthDeg: 189.72426
+    elevationDeg: 72.14037
+    size: 241.33324
+    widthAspect: 1.7777778
+    rollDeg: 0
+    mirror: 0
+    cellX: 1
+    cellY: 1
+    depth01: 0.5
+    brightHash: 0.996459
+    dissolveSeed: 0.15980378
+    puffCount: 3
+    puffSpread: 0.65
+    puffVariance: 0.4
+  - enabled: 1
+    azimuthDeg: 12.131811
+    elevationDeg: 72.66695
+    size: 99
+    widthAspect: 1.7777778
+    rollDeg: 1.6512604
+    mirror: 0
+    cellX: 0
+    cellY: 0
+    depth01: 0.5
+    brightHash: 0.19432871
+    dissolveSeed: 0.9275279
+    puffCount: 4
+    puffSpread: 0.65
+    puffVariance: 0.4
+  - enabled: 1
+    azimuthDeg: 59.91361
+    elevationDeg: 78.33946
+    size: 183.74078
+    widthAspect: 1.6494845
+    rollDeg: -6.4381747
+    mirror: 1
+    cellX: 0
+    cellY: 1
+    depth01: 0.15
+    brightHash: 0.92517954
+    dissolveSeed: 0.9557851
+    puffCount: 3
+    puffSpread: 0.65
+    puffVariance: 0.4
+  - enabled: 1
+    azimuthDeg: 60.965935
+    elevationDeg: 67.43099
+    size: 142.23232
+    widthAspect: 1.7777778
+    rollDeg: -2.8708415
+    mirror: 0
+    cellX: 1
+    cellY: 0
+    depth01: 0.5
+    brightHash: 0.48117712
+    dissolveSeed: 0.6858416
+    puffCount: 4
+    puffSpread: 0.65
+    puffVariance: 0.4
+  - enabled: 1
+    azimuthDeg: 356.11185
+    elevationDeg: 68.17799
+    size: 131.80095
+    widthAspect: 1.7777777
+    rollDeg: -4.2881117
+    mirror: 1
+    cellX: 1
+    cellY: 1
+    depth01: 0.5
+    brightHash: 0.73269004
+    dissolveSeed: 0.26845315
+    puffCount: 3
+    puffSpread: 0.65
+    puffVariance: 0.4
+  - enabled: 1
+    azimuthDeg: 332.05426
+    elevationDeg: 75.53196
+    size: 338.4547
+    widthAspect: 1.6494845
+    rollDeg: 0
+    mirror: 0
+    cellX: 0
+    cellY: 3
+    depth01: 0.15
+    brightHash: 0.17674972
+    dissolveSeed: 0.005043789
+    puffCount: 3
+    puffSpread: 0.65
+    puffVariance: 0.4
+  - enabled: 1
+    azimuthDeg: 359.50397
+    elevationDeg: 67.44423
+    size: 99
+    widthAspect: 1.7777778
+    rollDeg: 0.661356
+    mirror: 1
+    cellX: 1
+    cellY: 1
+    depth01: 0.5
+    brightHash: 0.64916307
+    dissolveSeed: 0.6057374
+    puffCount: 4
+    puffSpread: 0.65
+    puffVariance: 0.4
+  - enabled: 1
+    azimuthDeg: 76.23516
+    elevationDeg: 71.740746
+    size: 180.97328
+    widthAspect: 1.777778
+    rollDeg: -4.8821683
+    mirror: 1
+    cellX: 0
+    cellY: 2
+    depth01: 0.5
+    brightHash: 0.2339989
+    dissolveSeed: 0.8770113
+    puffCount: 4
+    puffSpread: 0.65
+    puffVariance: 0.4
+  - enabled: 1
+    azimuthDeg: 324.47906
+    elevationDeg: 70.579765
+    size: 99
+    widthAspect: 1.7777778
+    rollDeg: 0.83209705
+    mirror: 0
+    cellX: 1
+    cellY: 1
+    depth01: 0.5
+    brightHash: 0.6682265
+    dissolveSeed: 0.021624455
+    puffCount: 4
+    puffSpread: 0.65
+    puffVariance: 0.4

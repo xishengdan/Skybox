@@ -1,0 +1,58 @@
+# Unity generated folders
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Maya swatch cache（不是 Unity 资产，Unity 本身也忽略 . 开头的文件夹）
+/[Aa]ssets/.mayaSwatches/
+
+# Asset meta data should only be ignored when the corresponding asset is also ignored
+!/[Aa]ssets/**/*.meta
+
+# Unity3D generated
+/[Aa]ssets/AssetStoreTools*
+*.pidb
+*.suo
+*.user
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+.vscode/
+*.csproj
+*.unityproj
+*.sln
+*.userprefs
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+sysinfo.txt
+
+# Crash reports
+crashlytics-build.properties
+/[Aa]ssets/[Ss]treamingAssets/aa.meta
+/[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# Builds
+*.apk
+*.aab
+*.unitypackage
+*.app
+/[Ee]xportedObj/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini

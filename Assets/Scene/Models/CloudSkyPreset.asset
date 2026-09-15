@@ -1,0 +1,83 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8632aa09fc0e6084abf723ca6b877a7b, type: 3}
+  m_Name: CloudSkyPreset
+  m_EditorClassIdentifier: 
+  materialPath: Assets/Scene/Mat/CloudBillboard.mat
+  atlasPath: Assets/Scene/Tex/CloudPacked.png
+  atlasCols: 2
+  atlasRows: 4
+  useShells: 1
+  shellRadiusNear: 380
+  shellRadiusMid: 640
+  shellRadiusFar: 900
+  coverageMaskPath: Assets/Scene/Tex/SkyCoverageMask.png
+  coverageMaskStrength: 1
+  puffCountMin: 2
+  puffCountMax: 4
+  puffSpread: 0.65
+  puffVariance: 0.4
+  layers:
+  - label: "\u5730\u5E73\u7EBF\u5C42\uFF08\u73B0\u72B6\uFF0C\u9ED8\u8BA4\u4E0D\u91CD\u5EFA\uFF09"
+    enabled: 0
+    objectName: SkyClouds
+    layoutPath: Assets/Scene/Models/CloudLayout.asset
+    meshPath: Assets/Scene/Models/CloudDome.asset
+    sortingOrder: 0
+    elevationMinDeg: 5
+    elevationMaxDeg: 32
+    horizonBias: 1.3
+    cloudCount: 46
+    useClusters: 1
+    clusterCount: 15
+    clusterSpreadDeg: 7
+    seed: 20260911
+    sizeMin: 120
+    sizeMax: 300
+    minSizeFloor: 200
+    elevationSizeFalloff: 1
+  - label: "\u4E2D\u9AD8\u5C42"
+    enabled: 1
+    objectName: SkyCloudsMid
+    layoutPath: Assets/Scene/Models/CloudLayoutMid.asset
+    meshPath: Assets/Scene/Models/CloudDomeMid.asset
+    sortingOrder: -1
+    elevationMinDeg: 30
+    elevationMaxDeg: 55
+    horizonBias: 1
+    cloudCount: 18
+    useClusters: 1
+    clusterCount: 7
+    clusterSpreadDeg: 9
+    seed: 20260912
+    sizeMin: 110
+    sizeMax: 240
+    minSizeFloor: 130
+    elevationSizeFalloff: 0
+  - label: "\u9AD8\u5929\u9876"
+    enabled: 1
+    objectName: SkyCloudsHigh
+    layoutPath: Assets/Scene/Models/CloudLayoutHigh.asset
+    meshPath: Assets/Scene/Models/CloudDomeHigh.asset
+    sortingOrder: -2
+    elevationMinDeg: 52
+    elevationMaxDeg: 85
+    horizonBias: 1
+    cloudCount: 10
+    useClusters: 1
+    clusterCount: 4
+    clusterSpreadDeg: 11
+    seed: 20260913
+    sizeMin: 90
+    sizeMax: 200
+    minSizeFloor: 110
+    elevationSizeFalloff: 0
