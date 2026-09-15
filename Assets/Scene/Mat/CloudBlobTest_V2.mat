@@ -22,15 +22,28 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _AOStrength: 0.6
+    - _AOStrength: 0.45
+    - _AOThreshold: 0.7
+    - _BottomShade: 0.22
+    - _BrightEdge: 0.68
+    - _BrightSoft: 0.26
     - _BrightStart: 0.72
+    - _ColdEdge: 0.5
+    - _ColdSoft: 0.16
+    - _HazeEnd: 1350
+    - _HazeStart: 480
+    - _HazeStrength: 0.4
     - _RimStrength: 0.12
     - _ShadowOffset: 0.42
     - _ShadowSoft: 0.16
+    - _TopBoost: 0.3
     m_Colors:
-    - _BrightColor: {r: 0.973, g: 0.953, b: 0.882, a: 1}
-    - _DarkColor: {r: 0.694, g: 0.745, b: 0.773, a: 1}
-    - _LightDir: {r: 0.42, g: 0.8, b: -0.44, a: 0}
-    - _MidColor: {r: 0.922, g: 0.89, b: 0.824, a: 1}
+    - _BrightColor: {r: 1, g: 0.97, b: 0.88, a: 1}
+    - _CloudLightDir: {r: -0.36, g: 0.9, b: 0.21, a: 0}
+    - _DarkColor: {r: 0.62, g: 0.66, b: 0.72, a: 1}
+    - _HazeColor: {r: 0.66, g: 0.78, b: 0.86, a: 1}
+    - _LightDir: {r: 0.6621576, g: 0.682795, b: -0.30876917, a: 0}
+    - _MidColor: {r: 1, g: 0.94, b: 0.83, a: 1}
+    - _NightColor: {r: 0.12, g: 0.14, b: 0.22, a: 1}
     - _RimColor: {r: 1, g: 0.93, b: 0.82, a: 1}
   m_BuildTextureStacks: []
