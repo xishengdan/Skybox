@@ -14,10 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   radius: 900
   maxCloudAngleDeg: 15
-  atlasCols: 2
+  atlasCols: 4
   atlasRows: 4
   atlasPath: Assets/Scene/Tex/CloudPacked.png
-  useShells: 1
+  useShells: 0
   shellRadiusNear: 380
   shellRadiusMid: 640
   shellRadiusFar: 900
@@ -31,37 +31,37 @@ MonoBehaviour:
   - enabled: 1
     azimuthDeg: 84.29845
     elevationDeg: 74.160614
-    size: 115.942085
+    size: 63.768147
     widthAspect: 1.7777778
     rollDeg: 1.2296143
     mirror: 1
-    cellX: 0
-    cellY: 1
+    cellX: 2
+    cellY: 0
     depth01: 0.5
     brightHash: 0.75014365
     dissolveSeed: 0.4198515
-    puffCount: 2
-    puffSpread: 0.65
+    puffCount: 1
+    puffSpread: 1
     puffVariance: 0.4
   - enabled: 1
     azimuthDeg: 189.72426
     elevationDeg: 72.14037
-    size: 241.33324
+    size: 132.73328
     widthAspect: 1.7777778
     rollDeg: 0
     mirror: 0
-    cellX: 1
-    cellY: 1
+    cellX: 3
+    cellY: 0
     depth01: 0.5
     brightHash: 0.996459
     dissolveSeed: 0.15980378
-    puffCount: 3
-    puffSpread: 0.65
+    puffCount: 1
+    puffSpread: 1
     puffVariance: 0.4
   - enabled: 1
     azimuthDeg: 12.131811
     elevationDeg: 72.66695
-    size: 99
+    size: 54.45
     widthAspect: 1.7777778
     rollDeg: 1.6512604
     mirror: 0
@@ -70,28 +70,28 @@ MonoBehaviour:
     depth01: 0.5
     brightHash: 0.19432871
     dissolveSeed: 0.9275279
-    puffCount: 4
-    puffSpread: 0.65
+    puffCount: 1
+    puffSpread: 1
     puffVariance: 0.4
   - enabled: 1
     azimuthDeg: 59.91361
     elevationDeg: 78.33946
-    size: 183.74078
+    size: 64.30927
     widthAspect: 1.6494845
     rollDeg: -6.4381747
     mirror: 1
-    cellX: 0
-    cellY: 1
+    cellX: 2
+    cellY: 0
     depth01: 0.15
     brightHash: 0.92517954
     dissolveSeed: 0.9557851
-    puffCount: 3
-    puffSpread: 0.65
+    puffCount: 1
+    puffSpread: 1
     puffVariance: 0.4
   - enabled: 1
     azimuthDeg: 60.965935
     elevationDeg: 67.43099
-    size: 142.23232
+    size: 78.227776
     widthAspect: 1.7777778
     rollDeg: -2.8708415
     mirror: 0
@@ -100,81 +100,81 @@ MonoBehaviour:
     depth01: 0.5
     brightHash: 0.48117712
     dissolveSeed: 0.6858416
-    puffCount: 4
-    puffSpread: 0.65
+    puffCount: 1
+    puffSpread: 1
     puffVariance: 0.4
   - enabled: 1
     azimuthDeg: 356.11185
     elevationDeg: 68.17799
-    size: 131.80095
+    size: 72.490524
     widthAspect: 1.7777777
     rollDeg: -4.2881117
     mirror: 1
-    cellX: 1
-    cellY: 1
+    cellX: 3
+    cellY: 0
     depth01: 0.5
     brightHash: 0.73269004
     dissolveSeed: 0.26845315
-    puffCount: 3
-    puffSpread: 0.65
+    puffCount: 1
+    puffSpread: 1
     puffVariance: 0.4
   - enabled: 1
     azimuthDeg: 332.05426
     elevationDeg: 75.53196
-    size: 338.4547
+    size: 118.459145
     widthAspect: 1.6494845
     rollDeg: 0
     mirror: 0
-    cellX: 0
-    cellY: 3
+    cellX: 2
+    cellY: 1
     depth01: 0.15
     brightHash: 0.17674972
     dissolveSeed: 0.005043789
-    puffCount: 3
-    puffSpread: 0.65
+    puffCount: 1
+    puffSpread: 1
     puffVariance: 0.4
   - enabled: 1
     azimuthDeg: 359.50397
     elevationDeg: 67.44423
-    size: 99
+    size: 54.45
     widthAspect: 1.7777778
     rollDeg: 0.661356
     mirror: 1
-    cellX: 1
-    cellY: 1
+    cellX: 3
+    cellY: 0
     depth01: 0.5
     brightHash: 0.64916307
     dissolveSeed: 0.6057374
-    puffCount: 4
-    puffSpread: 0.65
+    puffCount: 1
+    puffSpread: 1
     puffVariance: 0.4
   - enabled: 1
     azimuthDeg: 76.23516
     elevationDeg: 71.740746
-    size: 180.97328
+    size: 99.53531
     widthAspect: 1.777778
     rollDeg: -4.8821683
     mirror: 1
     cellX: 0
-    cellY: 2
+    cellY: 1
     depth01: 0.5
     brightHash: 0.2339989
     dissolveSeed: 0.8770113
-    puffCount: 4
-    puffSpread: 0.65
+    puffCount: 1
+    puffSpread: 1
     puffVariance: 0.4
   - enabled: 1
     azimuthDeg: 324.47906
     elevationDeg: 70.579765
-    size: 99
+    size: 54.45
     widthAspect: 1.7777778
     rollDeg: 0.83209705
     mirror: 0
-    cellX: 1
-    cellY: 1
+    cellX: 3
+    cellY: 0
     depth01: 0.5
     brightHash: 0.6682265
     dissolveSeed: 0.021624455
-    puffCount: 4
-    puffSpread: 0.65
+    puffCount: 1
+    puffSpread: 1
     puffVariance: 0.4

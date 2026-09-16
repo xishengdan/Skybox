@@ -3,406 +3,200 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>
-/// 从 Sources_V2 的参考图烘"天空球云层"用的云场贴图。
+/// 把云素材图集切成单朵云，烘成 v1 billboard 用的通道图集。
 ///
-/// 为什么不用程序化 FBM：
-///   FBM 长不出"设计过"的轮廓（多瓣、平底、有性格），质量天花板很低。
-///   参考图是美术画好的云，直接拿来用才是正解。
+/// 素材图集是黑底的整幅 sprite sheet，所以：
+///   1. alpha 直接从亮度得到（黑底=0，云=1）
+///   2. 边缘像素是"云 x 黑底"的混合，直接用亮度会偏暗 -> 按 alpha 反预乘
+///   3. 连通域切成单朵云，挑最大的若干朵装进图集
 ///
-/// 做法：
-///   1. 载入三朵参考云（主参考 / 宽扁 / 高大）+ 它们已有的剪影（当 alpha）
-///   2. 从参考图的亮度里抽出「形体高度」：亮的在顶、灰的在底，
-///      映射成 0..1，再模糊一次 -> 平滑的高度场
-///   3. 把三朵云按随机位置/缩放/±20°旋转撒进一张可平铺的场里
-///      （旋转限制在 ±20°，才能保持光照方向一致，不然云底会朝天）
-///   4. 输出 CloudLayerField.png： R = 密度(覆盖率)，G = 形体高度
-///
-/// shader 端：R 走覆盖率阈值，G 直接当伪高度做 ramp（不再靠启发式猜）
+/// 通道语义必须和 v1 的 CloudBillboard.shader 对齐：
+///   R = 中调主体  G = 暗部云底  B = 高光（只给 rim）  A = 密度
+///   shader 里「亮部 = 1 - R - G」，材质把 R 映到 _DarkColor、G 映到 _SecDarkColor。
+///   所以三个权重必须恒和 = 1：R=wMid、G=wDark，亮部就自动等于 wBright。
 /// </summary>
 public static class CloudShapeBaker
 {
-    private const int FieldSize = 1024;
-    private const int Placements = 10;
-    private const string SrcDir = "Assets/Scene/Tex/Sources_V2";
-    private const string OutPath = "Assets/Scene/Tex/CloudLayerField.png";
+    public const string SheetPath = "Assets/Scene/Tex/Sources_V2/云素材图集.jpg";
+    private const string AtlasPath = "Assets/Scene/Tex/CloudPacked.png";
+    private const int AtlasW = 2048, AtlasH = 2048, Cols = 4, Rows = 4, MaxShapes = Cols * Rows;
+    private const int MinBlobArea = 2600, MinBlobH = 38;
 
-    private class Shape
+    // ---------------------------------------------------------------
+    // 切图
+    // ---------------------------------------------------------------
+
+    public struct Blob { public int x0, y0, x1, y1, area; }
+
+    /// <summary>把素材图集切成单朵云。返回的数组顺序和烘图集时的格顺序一致。</summary>
+    public static List<Blob> SliceSheet()
     {
-        public int w, h;
-        public float[] density;   // 0..1
-        public float[] height;    // 0..1
-    }
+        var res = new List<Blob>();
+        var sheet = LoadSheet();
+        if (sheet == null) return res;
 
-    [MenuItem("Tools/Skybox Clouds/Bake Cloud Layer From References", false, 41)]
-    public static void Bake()
-    {
-        string[] srcNames = { "主参考图.jpg", "宽扁.jpg", "高大.jpg" };
-        string[] silNames = { "剪影_主参考_V2.png", "剪影_宽扁_V2.png", "剪影_高大_V2.png" };
-
-        var shapes = new List<Shape>();
-        for (int i = 0; i < srcNames.Length; i++)
-        {
-            var sh = BuildShape(Load(srcNames[i]), Load(silNames[i]));
-            if (sh != null)
-            {
-                shapes.Add(sh);
-                Debug.Log("[CloudShapeBaker] " + srcNames[i] + " -> 精灵 " + sh.w + "x" + sh.h);
-            }
-        }
-        if (shapes.Count == 0) { Debug.LogError("[CloudShapeBaker] 没有可用的参考图"); return; }
-
-        var fieldD = new float[FieldSize * FieldSize];
-        var fieldH = new float[FieldSize * FieldSize];
-        var rnd = new System.Random(20260916);
-
-        for (int n = 0; n < Placements; n++)
-        {
-            var sh = shapes[rnd.Next(shapes.Count)];
-            float targetH = FieldSize * (0.12f + (float)rnd.NextDouble() * 0.14f);   // 精灵在场里的高度
-            float scale = targetH / sh.h;
-            // 每朵云给一个随机强度：这样 shader 抬阈值就能"筛掉弱云"，
-            // 才能做到「地平线密、天顶疏」而不是整片一起变淡
-            float strength = 0.55f + (float)rnd.NextDouble() * 0.45f;
-            float sw = sh.w * scale, shh = targetH;
-            float halfW = sw * 0.5f, halfH = shh * 0.5f;
-
-            float ang = (((float)rnd.NextDouble() * 2f - 1f) * 5f) * Mathf.Deg2Rad;  // ±5°：大了云会歪
-            float ca = Mathf.Cos(ang), sa = Mathf.Sin(ang);
-            float cx = (float)rnd.NextDouble() * FieldSize;
-            float cy = (float)rnd.NextDouble() * FieldSize;
-
-            int ext = Mathf.CeilToInt(Mathf.Max(Mathf.Abs(halfW * ca) + Mathf.Abs(halfH * sa),
-                                                Mathf.Abs(halfW * sa) + Mathf.Abs(halfH * ca))) + 2;
-
-            for (int dy = -ext; dy <= ext; dy++)
-            for (int dx = -ext; dx <= ext; dx++)
-            {
-                float lx = dx, ly = dy;
-                float sx = lx * ca + ly * sa;
-                float sy = -lx * sa + ly * ca;
-                if (Mathf.Abs(sx) > halfW || Mathf.Abs(sy) > halfH) continue;
-
-                float u = (sx / halfW) * 0.5f + 0.5f;
-                float v = (sy / halfH) * 0.5f + 0.5f;
-                int spx = Mathf.Clamp((int)(u * sh.w), 0, sh.w - 1);
-                int spy = Mathf.Clamp((int)(v * sh.h), 0, sh.h - 1);
-                int si = spy * sh.w + spx;
-
-                float d = sh.density[si] * strength;
-                if (d <= 0.001f) continue;
-
-                int fx = ((int)(cx + dx) % FieldSize + FieldSize) % FieldSize;
-                int fy = ((int)(cy + dy) % FieldSize + FieldSize) % FieldSize;
-                int fi = fy * FieldSize + fx;
-
-                if (d > fieldD[fi]) { fieldD[fi] = d; fieldH[fi] = sh.height[si]; }
-            }
-        }
-
-        int hit = 0; foreach (var d in fieldD) if (d > 0.5f) hit++;
-        Debug.Log("[CloudShapeBaker] 云端覆盖 " + (100f * hit / fieldD.Length).ToString("F1") + "%");
-
-        var px = new Color32[FieldSize * FieldSize];
+        int W = sheet.width, H = sheet.height;
+        var px = sheet.GetPixels32();
+        var alpha = new float[W * H];
         for (int i = 0; i < px.Length; i++)
         {
-            px[i] = new Color32(
-                (byte)Mathf.Clamp(Mathf.RoundToInt(fieldD[i] * 255f), 0, 255),
-                (byte)Mathf.Clamp(Mathf.RoundToInt(fieldH[i] * 255f), 0, 255),
-                0, 255);
+            float l = (0.299f * px[i].r + 0.587f * px[i].g + 0.114f * px[i].b) / 255f;
+            alpha[i] = Smooth(0.05f, 0.16f, l);
         }
+        // 小幅闭运算：修掉 JPEG 压缩把云边缘打碎的小孔
+        var m = Erode(Dilate(ToMask(alpha, 0.5f), W, H, 2), W, H, 2);
 
-        var tex = new Texture2D(FieldSize, FieldSize, TextureFormat.RGBA32, false);
-        tex.SetPixels32(px);
-        System.IO.File.WriteAllBytes(OutPath, tex.EncodeToPNG());
-        Object.DestroyImmediate(tex);
-
-        AssetDatabase.ImportAsset(OutPath, ImportAssetOptions.ForceUpdate);
-        var imp = AssetImporter.GetAtPath(OutPath) as TextureImporter;
-        if (imp != null)
+        var seen = new bool[m.Length];
+        var st = new Stack<int>();
+        for (int i = 0; i < m.Length; i++)
         {
-            imp.wrapMode = TextureWrapMode.Repeat;
-            imp.sRGBTexture = false;
-            imp.mipmapEnabled = true;
-            imp.filterMode = FilterMode.Bilinear;
-            imp.alphaSource = TextureImporterAlphaSource.None;
-            imp.maxTextureSize = FieldSize;
-            imp.textureCompression = TextureImporterCompression.Uncompressed;
-            imp.SaveAndReimport();
+            if (!m[i] || seen[i]) continue;
+            seen[i] = true; st.Push(i);
+            int x0 = W, y0 = H, x1 = -1, y1 = -1, a = 0;
+            while (st.Count > 0)
+            {
+                int c = st.Pop(); int cy = c / W, cx = c - cy * W; a++;
+                if (cx < x0) x0 = cx; if (cx > x1) x1 = cx;
+                if (cy < y0) y0 = cy; if (cy > y1) y1 = cy;
+                for (int d = 0; d < 4; d++)
+                {
+                    int nx = cx + (d == 0 ? 1 : d == 1 ? -1 : 0);
+                    int ny = cy + (d == 2 ? 1 : d == 3 ? -1 : 0);
+                    if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+                    int ni = ny * W + nx;
+                    if (!m[ni] || seen[ni]) continue;
+                    seen[ni] = true; st.Push(ni);
+                }
+            }
+            if (a >= MinBlobArea && (y1 - y0 + 1) >= MinBlobH)
+                res.Add(new Blob { x0 = x0, y0 = y0, x1 = x1, y1 = y1, area = a });
         }
 
-        AssetDatabase.SaveAssets();
-        Debug.Log("[CloudShapeBaker] 已输出 " + OutPath + " (R=密度 G=高度, " + FieldSize + "x" + FieldSize + ", 可平铺)");
+        // 取最大的若干朵（确定性排序，保证 SliceSheet 与烘图集顺序一致）
+        res.Sort((a, b) =>
+        {
+            int c = b.area.CompareTo(a.area);
+            if (c != 0) return c;
+            c = a.y0.CompareTo(b.y0);
+            return c != 0 ? c : a.x0.CompareTo(b.x0);
+        });
+        if (res.Count > MaxShapes) res.RemoveRange(MaxShapes, res.Count - MaxShapes);
+
+        // 再按位置（左上 -> 右下）排，让图集里的顺序稳定可读
+        res.Sort((a, b) =>
+        {
+            int c = (a.y0 / 128).CompareTo(b.y0 / 128);
+            if (c != 0) return c;
+            c = a.x0.CompareTo(b.x0);
+            return c != 0 ? c : a.y0.CompareTo(b.y0);
+        });
+        return res;
     }
 
-    // ==================== v1 billboard 图集（2x4 格）====================
-
-    private const string AtlasPath = "Assets/Scene/Tex/CloudPacked.png";
-    private const int AtlasW = 1024, AtlasH = 1024, AtlasCols = 2, AtlasRows = 4;
-
-    private class AtlasSprite
+    /// <summary>各格的原始宽高比，给布局工具按参考图云块的形状挑变体用。</summary>
+    public static float[] GetShapeAspects()
     {
-        public int w, h;
-        public float[] alpha, d1, d2, hl;
+        var b = SliceSheet();
+        var r = new float[b.Count];
+        for (int i = 0; i < b.Count; i++)
+            r[i] = (b[i].x1 - b[i].x0 + 1) / (float)Mathf.Max(1, b[i].y1 - b[i].y0 + 1);
+        return r;
     }
 
-    /// <summary>
-    /// 用同一套参考图重烘 v1 的 billboard 图集，把天空球云层和面片云的风格统一。
-    /// 通道语义照 v1 CloudBillboard：R=暗部1  G=暗部2  B=高光（只给 rim）  A=密度，
-    /// shader 里「亮部 = 1 - R - G」。
-    /// </summary>
-    [MenuItem("Tools/Skybox Clouds/Bake Cloud Billboard Atlas From References", false, 42)]
+    // ---------------------------------------------------------------
+
+    [MenuItem("Tools/Skybox Clouds/Bake Cloud Billboard Atlas From References", false, 41)]
     public static void BakeBillboardAtlas()
     {
-        string[] srcNames = { "主参考图.jpg", "宽扁.jpg", "高大.jpg" };
-        string[] silNames = { "剪影_主参考_V2.png", "剪影_宽扁_V2.png", "剪影_高大_V2.png" };
+        var sheet = LoadSheet();
+        if (sheet == null) { Debug.LogError("[CloudShapeBaker] 找不到 " + SheetPath); return; }
 
-        var sprites = new List<AtlasSprite>();
-        for (int i = 0; i < srcNames.Length; i++)
+        int W = sheet.width, H = sheet.height;
+        var px = sheet.GetPixels32();
+        var alpha = new float[W * H];
+        var lum = new float[W * H];
+        for (int i = 0; i < px.Length; i++)
         {
-            var s = BuildAtlasSprite(Load(srcNames[i]), Load(silNames[i]));
-            if (s != null) { sprites.Add(s); Debug.Log("[CloudAtlasBaker] " + srcNames[i] + " -> " + s.w + "x" + s.h); }
+            float l = (0.299f * px[i].r + 0.587f * px[i].g + 0.114f * px[i].b) / 255f;
+            float a = Smooth(0.05f, 0.16f, l);
+            alpha[i] = a;
+            lum[i] = l / Mathf.Max(a, 0.40f);      // 反预乘：去掉黑底的混合，边缘才不会发暗
         }
-        if (sprites.Count == 0) { Debug.LogError("[CloudAtlasBaker] 没有可用的参考图"); return; }
 
-        int cellW = AtlasW / AtlasCols, cellH = AtlasH / AtlasRows;
+        var blobs = SliceSheet();
+        if (blobs.Count == 0) { Debug.LogError("[CloudShapeBaker] 没切出云块"); return; }
+
+        int cellW = AtlasW / Cols, cellH = AtlasH / Rows;
         var buf = new Color32[AtlasW * AtlasH];
 
-        int cells = AtlasCols * AtlasRows;
-        for (int c = 0; c < cells; c++)
+        for (int i = 0; i < blobs.Count; i++)
         {
-            var s = sprites[c % sprites.Count];
-            float k = 1f - 0.09f * ((c / sprites.Count) % 3);                      // 三档尺寸，避免重复感
-            float scale = Mathf.Min(cellW * 0.94f / s.w, cellH * 0.86f / s.h) * k;
-            int dw = Mathf.Max(2, Mathf.RoundToInt(s.w * scale));
-            int dh = Mathf.Max(2, Mathf.RoundToInt(s.h * scale));
+            var b = blobs[i];
+            int bw = b.x1 - b.x0 + 1, bh = b.y1 - b.y0 + 1;
+            float scale = Mathf.Min(cellW * 0.92f / bw, cellH * 0.82f / bh);
+            int dw = Mathf.Max(2, Mathf.RoundToInt(bw * scale));
+            int dh = Mathf.Max(2, Mathf.RoundToInt(bh * scale));
 
-            int cx = c % AtlasCols, cy = c / AtlasCols;
+            int cx = i % Cols, cy = i / Cols;
             int ox = cx * cellW + (cellW - dw) / 2;
-            int cellV0 = AtlasH - (cy + 1) * cellH;                                // 该格底边的像素 y（v 向上）
-            int oy = cellV0 + Mathf.RoundToInt(cellH * 0.07f);                     // 底边对齐平底基线
+            int cellV0 = AtlasH - (cy + 1) * cellH;                 // 该格底边（自下而上的行号）
+            int oy = cellV0 + Mathf.RoundToInt(cellH * 0.10f);      // 底边对齐，平底坐在同一条基线上
+
+            var inside = new List<float>();
+            for (int y = b.y0; y <= b.y1; y++)
+            for (int x = b.x0; x <= b.x1; x++)
+            {
+                int si = y * W + x;
+                if (alpha[si] > 0.5f) inside.Add(lum[si]);
+            }
+            if (inside.Count < 10) continue;
+            inside.Sort();
+            float lo = inside[(int)(0.06f * inside.Count)];
+            float hi = inside[(int)(0.94f * inside.Count)];
+            float inv = 1f / Mathf.Max(1e-4f, hi - lo);
 
             for (int y = 0; y < dh; y++)
             for (int x = 0; x < dw; x++)
             {
-                int sx = Mathf.Clamp((int)(x / scale), 0, s.w - 1);
-                int sy = Mathf.Clamp((int)(y / scale), 0, s.h - 1);
-                int si = sy * s.w + sx;
-                float a = s.alpha[si];
-                if (a <= 0.002f) continue;
-                int px = ox + x, py = oy + y;
-                if (px < 0 || px >= AtlasW || py < 0 || py >= AtlasH) continue;
-                buf[py * AtlasW + px] = new Color32(
-                    (byte)Mathf.Clamp(Mathf.RoundToInt(s.d1[si] * 255f), 0, 255),
-                    (byte)Mathf.Clamp(Mathf.RoundToInt(s.d2[si] * 255f), 0, 255),
-                    (byte)Mathf.Clamp(Mathf.RoundToInt(s.hl[si] * 255f), 0, 255),
+                int sx = Mathf.Clamp(b.x0 + (int)(x / scale), 0, W - 1);
+                int sy = Mathf.Clamp(b.y0 + (int)(y / scale), 0, H - 1);
+                int si = sy * W + sx;
+                float a = alpha[si];
+                if (a <= 0.004f) continue;
+
+                float L = Mathf.Clamp01((lum[si] - lo) * inv);
+                // 黑底素材的抗锯齿最外圈本身就是暗的（和黑底混合出来的），反预乘也救不回来，
+                // 直接按亮度分档会在云周围描出一圈半透明深色。让边缘强制走"亮部"，
+                // 奶油色和云体本身融在一起，看不出边。
+                float edge = 1f - Smooth(0.05f, 0.45f, a);
+                float wDark = (1f - Smooth(0.00f, 0.55f, L)) * (1f - edge);
+                float wBright = Mathf.Max(Smooth(0.55f, 1.00f, L), edge);
+                float wMid = Mathf.Clamp01(1f - wDark - wBright);
+
+                int dx = ox + x, dy = oy + y;
+                if (dx < 0 || dx >= AtlasW || dy < 0 || dy >= AtlasH) continue;
+                buf[dy * AtlasW + dx] = new Color32(
+                    (byte)Mathf.Clamp(Mathf.RoundToInt(wMid * 255f), 0, 255),
+                    (byte)Mathf.Clamp(Mathf.RoundToInt(wDark * 255f), 0, 255),
+                    (byte)Mathf.Clamp(Mathf.RoundToInt(wBright * 255f), 0, 255),
                     (byte)Mathf.Clamp(Mathf.RoundToInt(a * 255f), 0, 255));
             }
         }
 
-        var tex = new Texture2D(AtlasW, AtlasH, TextureFormat.RGBA32, false);
-        tex.SetPixels32(buf);
-        System.IO.File.WriteAllBytes(AtlasPath, tex.EncodeToPNG());
-        Object.DestroyImmediate(tex);
-
-        AssetDatabase.ImportAsset(AtlasPath, ImportAssetOptions.ForceUpdate);
-        var imp = AssetImporter.GetAtPath(AtlasPath) as TextureImporter;
-        if (imp != null)
-        {
-            imp.wrapMode = TextureWrapMode.Clamp;      // 图集不能 repeat，否则跨格渗色
-            imp.sRGBTexture = false;
-            imp.mipmapEnabled = true;
-            imp.filterMode = FilterMode.Bilinear;
-            imp.alphaSource = TextureImporterAlphaSource.FromInput;
-            imp.alphaIsTransparency = false;
-            imp.maxTextureSize = 2048;
-            imp.textureCompression = TextureImporterCompression.Compressed;
-            imp.SaveAndReimport();
-        }
-        AssetDatabase.SaveAssets();
-        Debug.Log("[CloudAtlasBaker] 已输出 " + AtlasPath + " (" + AtlasCols + "x" + AtlasRows + " 格, 1024x1024)");
+        WriteTexture(buf, AtlasW, AtlasH, AtlasPath, TextureWrapMode.Clamp);
+        Debug.Log("[CloudShapeBaker] 已输出 " + AtlasPath + "  形状 " + blobs.Count + " 朵  格 "
+            + Cols + "x" + Rows + "  " + AtlasW + "x" + AtlasH);
     }
 
-    /// <summary>把参考云拆成 alpha + 三个色阶（暗1 / 暗2 / 高光）。</summary>
-    private static AtlasSprite BuildAtlasSprite(Texture2D src, Texture2D sil)
+    // ---------------------------------------------------------------
+    // 工具
+    // ---------------------------------------------------------------
+
+    private static bool[] ToMask(float[] a, float t)
     {
-        if (src == null || sil == null) return null;
-        int W = src.width, H = src.height;
-        var sp = src.GetPixels32();
-        var mp = sil.GetPixels32();
-        if (sp.Length != mp.Length) return null;
-
-        bool hasA = false;
-        for (int i = 0; i < mp.Length; i++) if (mp[i].a < 250) { hasA = true; break; }
-        Color32 bg = mp[0];
-        var mask = new bool[W * H];
-        for (int i = 0; i < mp.Length; i++)
-            mask[i] = hasA ? mp[i].a > 127
-                           : (Mathf.Abs(mp[i].r - bg.r) + Mathf.Abs(mp[i].g - bg.g) + Mathf.Abs(mp[i].b - bg.b)) > 60;
-        mask = CleanSilhouette(mask, W, H, 6);
-
-        int x0 = W, y0 = H, x1 = -1, y1 = -1;
-        for (int y = 0; y < H; y++)
-        for (int x = 0; x < W; x++)
-            if (mask[y * W + x])
-            {
-                if (x < x0) x0 = x; if (x > x1) x1 = x;
-                if (y < y0) y0 = y; if (y > y1) y1 = y;
-            }
-        if (x1 < 0) return null;
-        int cw = x1 - x0 + 1, ch = y1 - y0 + 1;
-
-        var s = new AtlasSprite { w = cw, h = ch, alpha = new float[cw * ch], d1 = new float[cw * ch], d2 = new float[cw * ch], hl = new float[cw * ch] };
-
-        var dens = new float[cw * ch];
-        var lum = new float[cw * ch];
-        var inside = new List<float>();
-        for (int y = 0; y < ch; y++)
-        for (int x = 0; x < cw; x++)
-        {
-            int di = y * cw + x;
-            int si = (y + y0) * W + (x + x0);
-            dens[di] = mask[si] ? 1f : 0f;
-            var c = sp[si];
-            lum[di] = (0.299f * c.r + 0.587f * c.g + 0.114f * c.b) / 255f;
-            if (dens[di] > 0.5f) inside.Add(lum[di]);
-        }
-        if (inside.Count < 10) return null;
-        inside.Sort();
-        float lo = inside[(int)(0.06f * inside.Count)];
-        float hi = inside[(int)(0.94f * inside.Count)];
-        float inv = 1f / Mathf.Max(1e-4f, hi - lo);
-
-        dens = Blur(dens, cw, ch);
-        dens = Blur(dens, cw, ch);
-        for (int i = 0; i < dens.Length; i++)
-        {
-            float a = Mathf.Clamp01(dens[i]);
-            float L = Mathf.Clamp01((lum[i] - lo) * inv);
-            // 三色阶。注意 v1 材质的映射是  R -> _DarkColor(浅冷灰)  G -> _SecDarkColor(深冷蓝)，
-            // 所以 R 放"中调"、G 放"暗部"，亮部 = 1-R-G（shader 里算）。
-            // 阈值按参考图实测亮度分位定：暗 ~33% / 中 ~30% / 亮 ~37%
-            s.alpha[i] = a;
-            s.d1[i] = (Smooth(0.00f, 0.26f, L) * (1f - Smooth(0.38f, 0.62f, L))) * a;   // R = 中调
-            s.d2[i] = (1f - Smooth(0.00f, 0.26f, L)) * a;                              // G = 暗部
-            s.hl[i] = Smooth(0.72f, 0.92f, L) * a;                                     // B = 高光（只给 rim）
-        }
-        return s;
-    }
-
-    private static float Smooth(float a, float b, float x)
-    {
-        float t = Mathf.Clamp01((x - a) / Mathf.Max(1e-5f, b - a));
-        return t * t * (3f - 2f * t);
-    }
-
-    // ------------------------------------------------------------
-
-    /// <summary>把一张参考云 + 它的剪影，拆成 密度场(0..1) 与 形体高度场(0..1)。</summary>
-    private static Shape BuildShape(Texture2D src, Texture2D sil)
-    {
-        if (src == null || sil == null) return null;
-        int W = src.width, H = src.height;
-        var sp = src.GetPixels32();
-        var mp = sil.GetPixels32();
-        if (sp.Length != mp.Length) return null;
-
-        // 1) 剪影 -> mask（有 alpha 用 alpha，否则用与角落背景的色差）
-        bool hasA = false;
-        for (int i = 0; i < mp.Length; i++) if (mp[i].a < 250) { hasA = true; break; }
-        Color32 bg = mp[0];
-        var mask = new bool[W * H];
-        for (int i = 0; i < mp.Length; i++)
-        {
-            mask[i] = hasA
-                ? mp[i].a > 127
-                : (Mathf.Abs(mp[i].r - bg.r) + Mathf.Abs(mp[i].g - bg.g) + Mathf.Abs(mp[i].b - bg.b)) > 60;
-        }
-        mask = CleanSilhouette(mask, W, H, 6);
-
-        // 2) bbox
-        int x0 = W, y0 = H, x1 = -1, y1 = -1;
-        for (int y = 0; y < H; y++)
-        for (int x = 0; x < W; x++)
-            if (mask[y * W + x])
-            {
-                if (x < x0) x0 = x; if (x > x1) x1 = x;
-                if (y < y0) y0 = y; if (y > y1) y1 = y;
-            }
-        if (x1 < 0) return null;
-        int cw = x1 - x0 + 1, ch = y1 - y0 + 1;
-
-        var sh = new Shape { w = cw, h = ch, density = new float[cw * ch], height = new float[cw * ch] };
-
-        // 3) 密度：二值 mask + 两次 3x3 模糊（软边）
-        var dens = new float[cw * ch];
-        for (int y = 0; y < ch; y++)
-        for (int x = 0; x < cw; x++)
-            dens[y * cw + x] = mask[(y + y0) * W + (x + x0)] ? 1f : 0f;
-        dens = Blur(dens, cw, ch);
-        dens = Blur(dens, cw, ch);
-        for (int i = 0; i < dens.Length; i++) sh.density[i] = Mathf.Clamp01(dens[i]);
-
-        // 4) 高度：参考图亮度（亮=顶，灰=底），按 mask 内的分位归一化
-        var lum = new float[cw * ch];
-        var inside = new List<float>();
-        for (int y = 0; y < ch; y++)
-        for (int x = 0; x < cw; x++)
-        {
-            var c = sp[(y + y0) * W + (x + x0)];
-            float L = (0.299f * c.r + 0.587f * c.g + 0.114f * c.b) / 255f;
-            lum[y * cw + x] = L;
-            if (sh.density[y * cw + x] > 0.6f) inside.Add(L);
-        }
-        if (inside.Count < 10) return null;
-        inside.Sort();
-        float lo = inside[(int)(0.08f * inside.Count)];
-        float hi = inside[(int)(0.92f * inside.Count)];
-        float inv = 1f / Mathf.Max(1e-4f, hi - lo);
-
-        var hgt = new float[cw * ch];
-        for (int i = 0; i < hgt.Length; i++) hgt[i] = Mathf.Clamp01((lum[i] - lo) * inv);
-        hgt = Blur(hgt, cw, ch);
-        for (int i = 0; i < hgt.Length; i++) sh.height[i] = Mathf.Clamp01(hgt[i]) * sh.density[i];
-
-        return sh;
-    }
-
-    /// <summary>
-    /// 清理剪影：闭运算（封住细通道）+ 填洞。
-    /// 参考图的剪影可能带细白通道或空洞（剪影_高大_V2 就有一块），
-    /// 直接拿去当 alpha 会让烘出来的云和图集里出现破洞。
-    /// </summary>
-    private static bool[] CleanSilhouette(bool[] m, int w, int h, int r)
-    {
-        var closed = Erode(Dilate(m, w, h, r), w, h, r);
-        var outside = new bool[m.Length];
-        var st = new Stack<int>();
-        for (int x = 0; x < w; x++)
-        {
-            if (!closed[x]) { outside[x] = true; st.Push(x); }
-            if (!closed[(h - 1) * w + x]) { outside[(h - 1) * w + x] = true; st.Push((h - 1) * w + x); }
-        }
-        for (int y = 0; y < h; y++)
-        {
-            if (!closed[y * w]) { outside[y * w] = true; st.Push(y * w); }
-            if (!closed[y * w + w - 1]) { outside[y * w + w - 1] = true; st.Push(y * w + w - 1); }
-        }
-        while (st.Count > 0)
-        {
-            int c = st.Pop(); int cy = c / w, cx = c - cy * w;
-            for (int d = 0; d < 4; d++)
-            {
-                int nx = cx + (d == 0 ? 1 : d == 1 ? -1 : 0);
-                int ny = cy + (d == 2 ? 1 : d == 3 ? -1 : 0);
-                if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
-                int ni = ny * w + nx;
-                if (closed[ni] || outside[ni]) continue;
-                outside[ni] = true; st.Push(ni);
-            }
-        }
-        var res = new bool[m.Length];
-        for (int i = 0; i < res.Length; i++) res[i] = !outside[i];
-        return res;
+        var m = new bool[a.Length];
+        for (int i = 0; i < a.Length; i++) m[i] = a[i] > t;
+        return m;
     }
 
     private static bool[] Dilate(bool[] m, int w, int h, int r)
@@ -447,31 +241,42 @@ public static class CloudShapeBaker
         return o;
     }
 
-    private static float[] Blur(float[] a, int w, int h)
+    private static float Smooth(float a, float b, float x)
     {
-        var o = new float[a.Length];
-        for (int y = 0; y < h; y++)
-        for (int x = 0; x < w; x++)
-        {
-            float s = 0f; int n = 0;
-            for (int dy = -1; dy <= 1; dy++)
-            for (int dx = -1; dx <= 1; dx++)
-            {
-                int nx = x + dx, ny = y + dy;
-                if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
-                s += a[ny * w + nx]; n++;
-            }
-            o[y * w + x] = s / Mathf.Max(1, n);
-        }
-        return o;
+        float t = Mathf.Clamp01((x - a) / Mathf.Max(1e-5f, b - a));
+        return t * t * (3f - 2f * t);
     }
 
-    private static Texture2D Load(string name)
+    private static Texture2D LoadSheet()
     {
-        string p = System.IO.Path.Combine(Application.dataPath, "Scene/Tex/Sources_V2", name);
+        string p = System.IO.Path.Combine(Application.dataPath, "Scene/Tex/Sources_V2/云素材图集.jpg");
         if (!System.IO.File.Exists(p)) { Debug.LogWarning("[CloudShapeBaker] 找不到 " + p); return null; }
         var t = new Texture2D(2, 2, TextureFormat.RGBA32, false);
         t.LoadImage(System.IO.File.ReadAllBytes(p));
         return t;
+    }
+
+    private static void WriteTexture(Color32[] px, int w, int h, string path, TextureWrapMode wrap)
+    {
+        var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+        tex.SetPixels32(px);
+        System.IO.File.WriteAllBytes(path, tex.EncodeToPNG());
+        Object.DestroyImmediate(tex);
+
+        AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+        var imp = AssetImporter.GetAtPath(path) as TextureImporter;
+        if (imp != null)
+        {
+            imp.wrapMode = wrap;
+            imp.sRGBTexture = false;          // 当数据用，不要 sRGB 转换
+            imp.mipmapEnabled = true;         // 缩小后需要 mipmap，否则会走样出细直横线
+            imp.filterMode = FilterMode.Bilinear;
+            imp.alphaSource = TextureImporterAlphaSource.FromInput;
+            imp.alphaIsTransparency = false;
+            imp.maxTextureSize = 2048;
+            imp.textureCompression = TextureImporterCompression.Uncompressed;
+            imp.SaveAndReimport();
+        }
+        AssetDatabase.SaveAssets();
     }
 }

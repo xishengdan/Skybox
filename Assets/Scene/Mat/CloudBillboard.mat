@@ -26,32 +26,34 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _AerialStrength: 0
+    - _AerialStrength: 0.35
     - _AntiSunShade: 0.9
-    - _BottomShade: 0.397
+    - _BottomShade: 0
     - _BrightVariation: 0.1
     - _CellInset: 0.03
     - _Coverage: 0.3
     - _CoverageGlobal: 1
-    - _DepthHazeMul: 0.8
+    - _DepthHazeMul: 0.65
     - _Dissolve: 0.276
     - _DissolvePhaseSpread: 0.6
     - _DissolveSpeed: 0
-    - _FarOpacity: 0.743
-    - _FarSaturation: 0.92
-    - _GridCols: 2
+    - _FarFarDist: 900
+    - _FarNearDist: 380
+    - _FarOpacity: 0.88
+    - _FarSaturation: 0.9
+    - _GridCols: 4
     - _GridRows: 4
-    - _HorizonFade: 0.142
+    - _HorizonFade: 0.071
     - _Opacity: 1
-    - _ShadingScale: 0.42
+    - _ShadingScale: 1.32
     - _Softness: 0.543
-    - _SunRim: 1
+    - _SunRim: 0.61
     m_Colors:
     - _AerialColor: {r: 0.78, g: 0.85, b: 0.97, a: 1}
-    - _BrightColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BrightColor: {r: 0.97, g: 0.94, b: 0.88, a: 1}
     - _CloudTintGlobal: {r: 1, g: 0.95, b: 0.9, a: 1}
-    - _DarkColor: {r: 0.8, g: 0.82, b: 0.93, a: 1}
+    - _DarkColor: {r: 0.74, g: 0.76, b: 0.83, a: 1}
     - _NightColor: {r: 0.11999995, g: 0.13999996, b: 0.21999997, a: 1}
     - _RimColor: {r: 1, g: 0.93, b: 0.82, a: 1}
-    - _SecDarkColor: {r: 0.4, g: 0.44, b: 0.62, a: 1}
+    - _SecDarkColor: {r: 0.48, g: 0.53, b: 0.67, a: 1}
   m_BuildTextureStacks: []

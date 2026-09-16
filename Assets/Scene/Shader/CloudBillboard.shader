@@ -37,10 +37,12 @@ Shader "Skybox/CloudBillboard"
         // ---- 日夜（夜晚色，越暗越黑）----
         _NightColor ("Night Color", Color) = (0.12, 0.14, 0.22, 1)
 
-        // ---- 远近 / 大气透视（UV1.x = depth01）----
+        // ---- 远近 / 大气透视（逐像素；距离由网格构建器写入）----
         _AerialColor ("Aerial Color", Color) = (0.78, 0.85, 0.97, 1)
         _AerialStrength ("Aerial Strength (horizon)", Range(0, 1)) = 0.35
         _DepthHazeMul ("Depth Haze Mul", Range(0, 3)) = 1.5
+        _FarNearDist ("Far Near Dist", Float) = 380
+        _FarFarDist ("Far Far Dist", Float) = 900
         _FarOpacity ("Far Opacity", Range(0, 1)) = 0.85
         _FarSaturation ("Far Saturation", Range(0, 1)) = 0.85
 
@@ -105,6 +107,8 @@ Shader "Skybox/CloudBillboard"
             float4 _AerialColor;
             float _AerialStrength;
             float _DepthHazeMul;
+            float _FarNearDist;
+            float _FarFarDist;
             float _FarOpacity;
             float _FarSaturation;
             float _BrightVariation;
@@ -145,16 +149,25 @@ Shader "Skybox/CloudBillboard"
                 float threshold = saturate(lerp(1.0, _Coverage * _CoverageGlobal, cloudMask) + dissolve);
 
                 // 每朵云的深度 / 亮度 hash（4 顶点同值 -> per-cloud 常数）
-                float depth01 = saturate(i.meta.x);
                 float brightHash = i.meta.y;
 
                 // SDF -> 实心云（远云略降透明度）
                 float alpha = smoothstep(threshold, threshold + _Softness, c.a) * _Opacity;
-                alpha *= lerp(1.0, _FarOpacity, depth01);
 
-                // 云的球面方向（相对相机），用于 rim 和地平线淡出
+                // 云的球面方向（相对相机），用于 rim、地平线淡出、远近分级
                 float3 dir = normalize(i.worldPos - _WorldSpaceCameraPos);
                 alpha *= smoothstep(0.0, max(_HorizonFade, 1e-3), dir.y);
+
+                // 逐像素的"远近"代理：用于地平线淡出。
+                float elev01 = smoothstep(0.015, 0.55, dir.y);
+
+                // 远近分级：按"到相机的实际距离"逐像素算，不能按仰角。
+                // 按仰角的话高空的 Mid/High 拿到 elev01≈1（不衰减），地平线的 SkyClouds 拿到 ≈0（被削），
+                // 三层颜色就会不一样。各层都在同一半径上时 far01 是同一个常数。
+                // 也不用逐面片常量 depth01 —— 那样面片边界会突变成硬边，云团上切出细直横线。
+                float dist = length(i.worldPos - _WorldSpaceCameraPos);
+                float far01 = saturate((dist - _FarNearDist) / max(1.0, _FarFarDist - _FarNearDist));
+                alpha *= lerp(1.0, _FarOpacity, far01);
 
                 // 通道缩放：不改原画也能统一校准明暗强度
                 float d1 = saturate(c.r * _ShadingScale);
@@ -185,15 +198,13 @@ Shader "Skybox/CloudBillboard"
                 // 全局天气色调（脚本用 MaterialPropertyBlock 驱动）
                 col *= _CloudTintGlobal.rgb;
 
-                // 地平线大气透视 + 远近分级（独立叠加，避免被 _AerialStrength=0 屏蔽；且 clamp 防外推）
-                float horizonHaze = (1.0 - smoothstep(0.0, 0.35, dir.y)) * _AerialStrength;
-                float depthHaze = depth01 * _DepthHazeMul * 0.25;
-                float haze = saturate(horizonHaze + depthHaze);
+                // 地平线大气透视（逐像素，用仰角）
+                float haze = saturate((1.0 - elev01) * (_AerialStrength + _DepthHazeMul * 0.25));
                 col = lerp(col, _AerialColor.rgb, haze);
 
-                // 远云降饱和
+                // 远云降饱和：同样按实际距离（逐像素）
                 float luma = dot(col, float3(0.299, 0.587, 0.114));
-                col = lerp(float3(luma, luma, luma), col, lerp(1.0, _FarSaturation, depth01));
+                col = lerp(float3(luma, luma, luma), col, lerp(1.0, _FarSaturation, far01));
 
                 // 夜晚染色（_NightColor 越暗，夜晚越暗；不影响白天）
                 col *= lerp(_NightColor.rgb, float3(1, 1, 1), sunNightStep);

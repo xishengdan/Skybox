@@ -204,6 +204,10 @@ public static class CloudMeshBuilder
         if (atlas != null) mat.SetTexture("_CloudTex", atlas);
         mat.SetFloat("_GridCols", cols);
         mat.SetFloat("_GridRows", rows);
+        // 逐像素的远近分级用的是"到相机的实际距离"，参考距离始终取壳半径(Near/Far)。
+        // 三层都用同一个 radius 时，各层拿到的 far01 就是同一个常数，颜色才会一致。
+        mat.SetFloat("_FarNearDist", layout.shellRadiusNear);
+        mat.SetFloat("_FarFarDist", layout.shellRadiusFar);
         EditorUtility.SetDirty(mat);
 
         // ---- GameObject ----
