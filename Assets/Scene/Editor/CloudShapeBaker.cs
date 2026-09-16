@@ -103,6 +103,49 @@ public static class CloudShapeBaker
         return r;
     }
 
+    /// <summary>各格"平底程度"：底部 3% 行宽 / 最大行宽。
+    /// 接近 1 = 平底素材（只有在地平线上坐着才合理，放到天上会是一条横直线）；
+    /// 接近 0 = 圆润蓬松，任何仰角都能放。</summary>
+    public static float[] GetShapeFlatness()
+    {
+        var res = new float[0];
+        var sheet = LoadSheet();
+        if (sheet == null) return res;
+
+        int W = sheet.width, H = sheet.height;
+        var px = sheet.GetPixels32();
+        var alpha = new float[W * H];
+        for (int i = 0; i < px.Length; i++)
+        {
+            float l = (0.299f * px[i].r + 0.587f * px[i].g + 0.114f * px[i].b) / 255f;
+            alpha[i] = Smooth(0.05f, 0.16f, l);
+        }
+
+        var blobs = SliceSheet();
+        res = new float[blobs.Count];
+        for (int i = 0; i < blobs.Count; i++)
+        {
+            var b = blobs[i];
+            int bh = b.y1 - b.y0 + 1;
+            // 量"底边轮廓的平直度"：逐列取最低的云像素 y，算标准差。
+            // 底边是一条横直线 -> 标准差接近 0；圆润的底 -> 标准差很大。
+            var bottoms = new List<float>();
+            for (int x = b.x0; x <= b.x1; x++)
+            {
+                for (int y = b.y0; y <= b.y1; y++)
+                {
+                    if (alpha[y * W + x] > 0.5f) { bottoms.Add(y - b.y0); break; }
+                }
+            }
+            if (bottoms.Count < 4) { res[i] = 0f; continue; }
+            float mean = 0f; foreach (float v in bottoms) mean += v; mean /= bottoms.Count;
+            float acc = 0f; foreach (float v in bottoms) acc += (v - mean) * (v - mean);
+            float sd = Mathf.Sqrt(acc / bottoms.Count);
+            res[i] = 1f - Mathf.Clamp01(sd / (bh * 0.14f));
+        }
+        return res;
+    }
+
     // ---------------------------------------------------------------
 
     [MenuItem("Tools/Skybox Clouds/Bake Cloud Billboard Atlas From References", false, 41)]

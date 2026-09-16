@@ -51,7 +51,8 @@ public class SkyDayNightController : MonoBehaviour
     [Tooltip("曲线模式下的整体强度倍率")] public float curveIntensityScale = 2f;
 
     [Header("云层旋转")]
-    public Transform cloudRoot;                     // 云穹顶
+    [Tooltip("要一起旋转的云穹顶（SkyClouds / SkyCloudsMid / SkyCloudsHigh）。三层必须同一个角度，否则会互相错位。")]
+    public Transform[] cloudRoots;                  // 云穹顶
     public bool rotateClouds = true;
     public float cloudSpinDegPerSec = 1.5f;         // 横向旋转速度（度/秒）
 
@@ -67,8 +68,9 @@ public class SkyDayNightController : MonoBehaviour
     private void OnEnable()
     {
         lastRealtime = Time.realtimeSinceStartup;
-        if (cloudRoot != null)
-            cloudAngle = cloudRoot.eulerAngles.y;
+        if (cloudRoots != null)
+            foreach (var t in cloudRoots)
+                if (t != null) { cloudAngle = t.eulerAngles.y; break; }
     }
 
     private void Update()
@@ -123,10 +125,11 @@ public class SkyDayNightController : MonoBehaviour
             }
         }
 
-        if (rotateClouds && cloudRoot != null)
+        if (rotateClouds && cloudRoots != null && cloudRoots.Length > 0)
         {
             cloudAngle += cloudSpinDegPerSec * dt;
-            cloudRoot.rotation = Quaternion.Euler(0f, cloudAngle, 0f);
+            var rot = Quaternion.Euler(0f, cloudAngle, 0f);
+            foreach (var t in cloudRoots) if (t != null) t.rotation = rot;   // 三层同一角度，不会错位
         }
 
         // 光照闭环：天空变了就把环境光探针重算一次，否则环境光会停在烘焙那一刻

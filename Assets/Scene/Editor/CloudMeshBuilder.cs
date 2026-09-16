@@ -16,6 +16,8 @@ public static class CloudMeshBuilder
         var uvs = new List<Vector4>();
         var uv1s = new List<Vector2>();
         var colors = new List<Color>();
+        var normals = new List<Vector3>();
+        var tangents = new List<Vector4>();
         var quadDepths = new List<float>();
         var quadSubs = new List<float>();
 
@@ -142,6 +144,10 @@ public static class CloudMeshBuilder
                     uvs.Add(new Vector4(ux, luv[k].y, cellOrigin.x, cellOrigin.y));
                     uv1s.Add(new Vector2(Mathf.Clamp01(e.depth01), brightHash));
                     colors.Add(new Color(dissolveSeed, dissolveSeed, 0f, cloudCoverage));
+                    // 法线 = 面片朝外（≈ 朝相机）；切线 = 面片右向量。
+                    // shader 用它们把图集密度场当高度场求法线，做实时太阳受光。
+                    normals.Add(dir);
+                    tangents.Add(new Vector4(r2.x, r2.y, r2.z, 1f));
                 }
                 quadDepths.Add(e.depth01);
                 quadSubs.Add(sub++);
@@ -182,6 +188,8 @@ public static class CloudMeshBuilder
         mesh.SetUVs(0, uvs);
         mesh.SetUVs(1, uv1s);
         mesh.SetColors(colors);
+        mesh.SetNormals(normals);
+        mesh.SetTangents(tangents);
         mesh.SetTriangles(tris, 0);
         mesh.RecalculateBounds();
         EditorUtility.SetDirty(mesh);

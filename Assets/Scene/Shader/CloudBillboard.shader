@@ -29,6 +29,12 @@ Shader "Skybox/CloudBillboard"
         _BottomShade ("Bottom Shade", Range(0, 1)) = 0.35
         _BrightVariation ("Bright Variation", Range(0, 0.5)) = 0.12
 
+        // ---- 实时太阳受光 ----
+        // _BlobBump：把图集的密度场当高度场求法线的强度，越大越立体
+        _BlobBump ("Blob Bump", Range(0, 20)) = 6.0
+        _SunLightIntensity ("Sun Light Intensity", Range(0, 3)) = 1.0
+        _CloudAmbient ("Cloud Ambient", Color) = (0.62, 0.70, 0.85, 1)
+
         // ---- 受光（太阳为唯一主光）----
         _RimColor ("Rim Color", Color) = (1, 0.96, 0.88, 1)
         _SunRim ("Sun Rim", Range(0, 3)) = 1.0
@@ -71,16 +77,20 @@ Shader "Skybox/CloudBillboard"
                 float4 vertex : POSITION;
                 float4 uv     : TEXCOORD0;   // xy = quad 内局部 uv, zw = 图集格原点
                 float2 meta   : TEXCOORD1;   // x = depth01, y = brightHash
-                float4 color  : COLOR;
+                float4 color   : COLOR;
+                float3 normal  : NORMAL;     // 面片朝外（≈ 朝相机）
+                float4 tangent : TANGENT;    // xyz = 面片右向量
             };
 
             struct v2f
             {
                 float4 pos      : SV_POSITION;
                 float4 uv       : TEXCOORD0;
-                float4 color    : COLOR;
                 float3 worldPos : TEXCOORD1;
                 float2 meta     : TEXCOORD2;
+                float4 color    : COLOR;
+                float3 normal   : TEXCOORD3;
+                float3 tangent  : TEXCOORD4;
             };
 
             TEXTURE2D(_CloudTex);
@@ -115,6 +125,9 @@ Shader "Skybox/CloudBillboard"
             float _AntiSunShade;
             float _CoverageGlobal;
             float4 _CloudTintGlobal;
+            float _BlobBump;
+            float _SunLightIntensity;
+            float4 _CloudAmbient;
 
             v2f vert (appdata v)
             {
@@ -124,6 +137,8 @@ Shader "Skybox/CloudBillboard"
                 o.color = v.color;
                 o.worldPos = TransformObjectToWorld(v.vertex.xyz);
                 o.meta = v.meta;
+                o.normal = TransformObjectToWorldNormal(v.normal);
+                o.tangent = TransformObjectToWorldDir(v.tangent.xyz);
                 return o;
             }
 
@@ -183,14 +198,35 @@ Shader "Skybox/CloudBillboard"
                 // 每朵亮度扰动
                 col *= 1.0 + (brightHash - 0.5) * _BrightVariation;
 
-                // 太阳侧边缘光
+                // ---- 云团法线 ----
+                // 面片没有真实法线，做不了实时受光。把图集的密度场当高度场求一次梯度当法线，
+                // 这是 billboard 云做实时光照的常规做法。
+                float2 uvOff = cellSize * 0.004;
+                float hC = c.a;
+                float hR = SAMPLE_TEXTURE2D(_CloudTex, sampler_CloudTex, uv + float2(uvOff.x, 0)).a;
+                float hU = SAMPLE_TEXTURE2D(_CloudTex, sampler_CloudTex, uv + float2(0, uvOff.y)).a;
+
+                float3 Nw = normalize(i.normal);              // 面片朝外（≈ 朝相机）
+                float3 T  = normalize(i.tangent);
+                float3 Bn = normalize(cross(Nw, T));
+                float3 Nb = normalize(Nw + (T * (hC - hR) + Bn * (hC - hU)) * _BlobBump);
+
+                // ---- 实时太阳 ----
                 Light mainLight = GetMainLight();
                 float3 sunDir = mainLight.direction;
-                float sunSide = saturate(dot(dir, sunDir) * 0.5 + 0.5);
-                col += _RimColor.rgb * pow(sunSide, 4.0) * _SunRim * (hl + bright * 0.5);
+                float ndl  = dot(Nb, sunDir);
+                float wrap = saturate(ndl * 0.65 + 0.35);     // 半兰伯特：云有次表面散射感，暗面不会被压死
 
-                // 背阳侧整体压暗（太阳为唯一主光）
-                col *= lerp(_AntiSunShade, 1.0, sunSide);
+                // 用 lerp 而不是相乘：受光面 = 太阳色，背光面 = 环境色。
+                // 相乘会把图集里云自身的明暗结构一起压掉，整朵云变成一块灰饼。
+                float3 litCol = lerp(_CloudAmbient.rgb, mainLight.color * _SunLightIntensity, wrap);
+                col *= litCol;
+
+                // ---- 边缘光：朝太阳那一侧的轮廓发光 ----
+                // （之前用 dir 点太阳方向：dir 整张面片几乎不变，那只是"整朵云提亮"，不是边缘）
+                float fres = pow(1.0 - saturate(dot(Nb, Nw)), 2.0);
+                float rimSide = saturate(ndl * 0.5 + 0.5);
+                col += _RimColor.rgb * mainLight.color * _SunRim * fres * rimSide;
 
                 // 日夜因子（夜晚染色放到雾化之后，避免被 AerialColor 提亮）
                 float sunNightStep = smoothstep(-0.3, 0.25, sunDir.y);

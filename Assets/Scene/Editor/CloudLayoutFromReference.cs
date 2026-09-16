@@ -20,17 +20,20 @@ public static class CloudLayoutFromReference
         if (lay == null) { Debug.LogError("[LayoutFromRef] 找不到 " + MainLayout); return; }
 
         float[] aspects = CloudShapeBaker.GetShapeAspects();
+        float[] flats = CloudShapeBaker.GetShapeFlatness();
         if (aspects.Length == 0) { Debug.LogError("[LayoutFromRef] 云素材图集切不出云块"); return; }
         lay.atlasCols = 4;
         lay.atlasRows = 4;
 
         var report = new System.Text.StringBuilder();
-        report.AppendLine("变体 " + aspects.Length + " 种，图集 " + lay.atlasCols + "x" + lay.atlasRows);
+        int roundN = 0; for (int i = 0; i < flats.Length; i++) if (flats[i] < 0.62f) roundN++;
+        report.AppendLine("变体 " + aspects.Length + " 种（平底 " + (aspects.Length - roundN) + " / 圆润 " + roundN
+            + "），图集 " + lay.atlasCols + "x" + lay.atlasRows);
 
         var list = new List<CloudEntry>();
-        int n = AddHorizonMasses(list, lay, report, aspects, "主参考_天空.png",
+        int n = AddHorizonMasses(list, lay, report, aspects, flats, "主参考_天空.png",
             yTopFrac: 0.02f, yBotFrac: 0.78f, elevTop: 26f, elevBot: 0f,
-            gridDiv: 0.95f, sizeMul: 1.15f,
+            gridDiv: 0.95f, sizeMul: 1.15f, flatMaxElev: 15f,
             minLum: 0.62f, maxSat: 0.30f, minAreaFrac: 0.00010f);
 
         lay.clouds = list;
@@ -47,21 +50,27 @@ public static class CloudLayoutFromReference
     public static void RepairMidHighGrid()
     {
         var sb = new System.Text.StringBuilder();
+        var flats = CloudShapeBaker.GetShapeFlatness();
+        var roundIdx = new List<int>();
+        for (int i = 0; i < flats.Length; i++) if (flats[i] < 0.62f) roundIdx.Add(i);
+
         foreach (var p in new[] { "Assets/Scene/Models/CloudLayoutMid.asset", "Assets/Scene/Models/CloudLayoutHigh.asset" })
         {
             var lay = AssetDatabase.LoadAssetAtPath<CloudLayout>(p);
             if (lay == null) { sb.AppendLine("缺 " + p); continue; }
-            int oldCols = Mathf.Max(1, lay.atlasCols), oldRows = Mathf.Max(1, lay.atlasRows);
+            // 这两层都在 15° 以上：格号和图集格数都要跟着 4x4 图集走，
+            // 且只能用圆润素材 —— 平底素材放到天上会变成一条横直线。
+            int k = 0;
             foreach (var e in lay.clouds)
             {
-                int oldIdx = Mathf.Clamp(e.cellX + e.cellY * oldCols, 0, oldCols * oldRows - 1);
-                e.cellX = oldIdx % 4;
-                e.cellY = oldIdx / 4;
+                int idx = roundIdx.Count > 0 ? roundIdx[(k++) % roundIdx.Count] : 0;
+                e.cellX = idx % 4;
+                e.cellY = idx / 4;
             }
             lay.atlasCols = 4; lay.atlasRows = 4;
             EditorUtility.SetDirty(lay);
             CloudMeshBuilder.Build(lay);
-            sb.AppendLine(System.IO.Path.GetFileName(p) + " : " + oldCols + "x" + oldRows + " -> 4x4，格号已重映射");
+            sb.AppendLine(System.IO.Path.GetFileName(p) + " : " + lay.clouds.Count + " 朵 -> 4x4 图集，只用圆润素材 " + roundIdx.Count + " 种");
         }
         AssetDatabase.SaveAssets();
         Debug.Log("[LayoutFromRef] " + sb.ToString().Replace("\n", " | "));
@@ -70,8 +79,8 @@ public static class CloudLayoutFromReference
     // ---------------------------------------------------------------
 
     private static int AddHorizonMasses(List<CloudEntry> outList, CloudLayout lay, System.Text.StringBuilder report,
-        float[] aspects, string file, float yTopFrac, float yBotFrac, float elevTop, float elevBot,
-        float gridDiv, float sizeMul, float minLum, float maxSat, float minAreaFrac)
+        float[] aspects, float[] flats, string file, float yTopFrac, float yBotFrac, float elevTop, float elevBot,
+        float gridDiv, float sizeMul, float flatMaxElev, float minLum, float maxSat, float minAreaFrac)
     {
         var tex = Load(file);
         if (tex == null) { report.AppendLine("  缺 " + file); return 0; }
@@ -148,7 +157,9 @@ public static class CloudLayoutFromReference
             foreach (var cell in cells)
             {
                 float elev = Mathf.Lerp(elevTop, elevBot, Mathf.InverseLerp(yTopFrac, yBotFrac, cell.y / (float)H));
-                int shape = PickShape(rawAspect, cells.Count >= 4, aspects, added);
+                // 平底素材只允许出现在地平线附近：放到天上会变成一条横直线
+                bool allowFlat = elev < flatMaxElev;
+                int shape = PickShape(rawAspect, cells.Count >= 4, aspects, flats, allowFlat, added);
 
                 for (int t2 = 0; t2 < tileN; t2++)
                 {
@@ -187,19 +198,28 @@ public static class CloudLayoutFromReference
 
     // ---------------------------------------------------------------
 
-    private static int PickShape(float aspect, bool mass, float[] aspects, int seed)
+    /// <summary>按参考图云块的宽高比挑变体。allowFlat=false 时只挑"圆润"的素材 ——
+    /// 平底素材放到地平线以上会变成一条横直线。mass = 成片云团，避开扁长的变体。</summary>
+    private static int PickShape(float aspect, bool mass, float[] aspects, float[] flats, bool allowFlat, int seed)
     {
         float bestD = float.MaxValue;
         var cand = new List<int>();
         for (int i = 0; i < aspects.Length; i++)
         {
-            if (mass && aspects[i] > 2.15f) continue;      // 成片的云团用圆润的变体填
+            if (!allowFlat && flats[i] >= 0.62f) continue;
+            if (mass && aspects[i] > 2.15f) continue;
             float d = Mathf.Abs(aspects[i] - aspect);
             if (d < bestD - 0.001f) { bestD = d; cand.Clear(); cand.Add(i); }
             else if (d <= bestD + 0.45f) cand.Add(i);
         }
-        if (cand.Count == 0) return 0;
+        if (cand.Count == 0) return allowFlat ? 0 : FirstRound(flats);
         return cand[Mathf.Abs(seed) % cand.Count];
+    }
+
+    private static int FirstRound(float[] flats)
+    {
+        for (int i = 0; i < flats.Length; i++) if (flats[i] < 0.62f) return i;
+        return 0;
     }
 
     private struct Blob { public int x0, y0, x1, y1; public int area; }

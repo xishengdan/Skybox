@@ -35,8 +35,8 @@ MonoBehaviour:
     widthAspect: 1.9277109
     rollDeg: -6.599912
     mirror: 1
-    cellX: 1
-    cellY: 0
+    cellX: 0
+    cellY: 1
     depth01: 0.85
     brightHash: 0.90119344
     dissolveSeed: 0.83615494
@@ -50,8 +50,8 @@ MonoBehaviour:
     widthAspect: 1.7777778
     rollDeg: 0
     mirror: 1
-    cellX: 3
-    cellY: 0
+    cellX: 1
+    cellY: 1
     depth01: 0.5
     brightHash: 0.20032625
     dissolveSeed: 0.9596175
@@ -65,8 +65,8 @@ MonoBehaviour:
     widthAspect: 1.9277108
     rollDeg: 4.6818857
     mirror: 0
-    cellX: 2
-    cellY: 0
+    cellX: 3
+    cellY: 2
     depth01: 0.85
     brightHash: 0.9521075
     dissolveSeed: 0.9587842
@@ -81,7 +81,7 @@ MonoBehaviour:
     rollDeg: -4.3624783
     mirror: 1
     cellX: 2
-    cellY: 1
+    cellY: 3
     depth01: 0.15
     brightHash: 0.54389364
     dissolveSeed: 0.78984517
@@ -95,8 +95,8 @@ MonoBehaviour:
     widthAspect: 1.6494846
     rollDeg: -7.096825
     mirror: 1
-    cellX: 3
-    cellY: 0
+    cellX: 0
+    cellY: 1
     depth01: 0.15
     brightHash: 0.047086064
     dissolveSeed: 0.789267
@@ -110,7 +110,7 @@ MonoBehaviour:
     widthAspect: 1.9277109
     rollDeg: 0.49437237
     mirror: 1
-    cellX: 3
+    cellX: 1
     cellY: 1
     depth01: 0.85
     brightHash: 0.2551601
@@ -125,8 +125,8 @@ MonoBehaviour:
     widthAspect: 1.7777778
     rollDeg: 3.0910645
     mirror: 0
-    cellX: 2
-    cellY: 0
+    cellX: 3
+    cellY: 2
     depth01: 0.5
     brightHash: 0.6626107
     dissolveSeed: 0.7255332
@@ -140,8 +140,8 @@ MonoBehaviour:
     widthAspect: 1.9277109
     rollDeg: 3.8073015
     mirror: 0
-    cellX: 3
-    cellY: 1
+    cellX: 2
+    cellY: 3
     depth01: 0.85
     brightHash: 0.44734946
     dissolveSeed: 0.47383752
@@ -155,8 +155,8 @@ MonoBehaviour:
     widthAspect: 1.9277108
     rollDeg: -3.891808
     mirror: 1
-    cellX: 3
-    cellY: 0
+    cellX: 0
+    cellY: 1
     depth01: 0.85
     brightHash: 0.34817556
     dissolveSeed: 0.54817724
@@ -170,7 +170,7 @@ MonoBehaviour:
     widthAspect: 1.7777779
     rollDeg: -2.162219
     mirror: 1
-    cellX: 2
+    cellX: 1
     cellY: 1
     depth01: 0.5
     brightHash: 0.3555111
@@ -186,7 +186,7 @@ MonoBehaviour:
     rollDeg: -6.794472
     mirror: 0
     cellX: 3
-    cellY: 1
+    cellY: 2
     depth01: 0.85
     brightHash: 0.4750304
     dissolveSeed: 0.10887356
@@ -200,8 +200,8 @@ MonoBehaviour:
     widthAspect: 1.9277109
     rollDeg: -2.872892
     mirror: 1
-    cellX: 1
-    cellY: 0
+    cellX: 2
+    cellY: 3
     depth01: 0.85
     brightHash: 0.48791924
     dissolveSeed: 0.258781
@@ -215,8 +215,8 @@ MonoBehaviour:
     widthAspect: 1.7777778
     rollDeg: 1.9068518
     mirror: 1
-    cellX: 2
-    cellY: 0
+    cellX: 0
+    cellY: 1
     depth01: 0.5
     brightHash: 0.6806054
     dissolveSeed: 0.90375316
@@ -230,7 +230,7 @@ MonoBehaviour:
     widthAspect: 1.6494846
     rollDeg: -2.278977
     mirror: 0
-    cellX: 0
+    cellX: 1
     cellY: 1
     depth01: 0.15
     brightHash: 0.26926765
@@ -246,7 +246,7 @@ MonoBehaviour:
     rollDeg: -4.5545435
     mirror: 1
     cellX: 3
-    cellY: 1
+    cellY: 2
     depth01: 0.85
     brightHash: 0.29965845
     dissolveSeed: 0.35169247
@@ -260,8 +260,8 @@ MonoBehaviour:
     widthAspect: 1.7777778
     rollDeg: -5.405406
     mirror: 0
-    cellX: 1
-    cellY: 1
+    cellX: 2
+    cellY: 3
     depth01: 0.5
     brightHash: 0.42076948
     dissolveSeed: 0.93000627
@@ -275,7 +275,7 @@ MonoBehaviour:
     widthAspect: 1.6494845
     rollDeg: -3.290381
     mirror: 0
-    cellX: 3
+    cellX: 0
     cellY: 1
     depth01: 0.15
     brightHash: 0.72221035
@@ -290,7 +290,7 @@ MonoBehaviour:
     widthAspect: 1.9277109
     rollDeg: -2.4859629
     mirror: 1
-    cellX: 0
+    cellX: 1
     cellY: 1
     depth01: 0.85
     brightHash: 0.18150838
