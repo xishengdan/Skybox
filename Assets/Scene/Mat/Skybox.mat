@@ -56,11 +56,11 @@ Material:
     - _NoiseErosion: 1.508
     - _ScatterCompress: 1
     - _StarBrightness: 0.34
-    - _StarDensity: 0.85
+    - _StarDensity: 0.75
     - _StarFadeEnd: 0.226
     - _StarFadeStart: -0.17
     - _StarSize: 0.078
-    - _StarThreshold: 0.669
+    - _StarThreshold: 0.485
     - _SunEdgeSoft: 0.35
     - _SunGlowSize: 2.5
     - _SunGlowStrength: 0.6
