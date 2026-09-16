@@ -12,8 +12,15 @@
 # Maya swatch cache（不是 Unity 资产，Unity 本身也忽略 . 开头的文件夹）
 /[Aa]ssets/.mayaSwatches/
 
+# 截图工具的输出目录（每次截图都会重建，不进仓库）
+/[Aa]ssets/Screenshots/
+/[Aa]ssets/Screenshots.meta
+
 # Asset meta data should only be ignored when the corresponding asset is also ignored
 !/[Aa]ssets/**/*.meta
+
+# 注意：上面那条 ! 会把 Screenshots.meta 重新包含进来，所以这里必须再排一次
+/[Aa]ssets/Screenshots.meta
 
 # Unity3D generated
 /[Aa]ssets/AssetStoreTools*

@@ -57,6 +57,29 @@ Shader "Unlit/Skybox"
         _SunsetPower ("Sunset Power", Range(0.5, 8)) = 2.0
         _AirMassHeight ("Air Mass Height", Range(0.01, 1)) = 0.15
         _SunDirection ("Sun Direction", Vector) = (0, 1, 0, 0)
+
+        // ===== 天空球云层（平面投影：uv = dir.xz / dir.y）=====
+        // 近地平线投影被压缩 -> 云自动变密变小，"从下到上从多到少"免费获得
+        _CloudTex ("Cloud Field (R=Density G=Height)", 2D) = "black" {}
+        _CloudStrength ("Cloud Strength", Range(0,1)) = 1.0
+        _CloudScale ("Cloud Scale", Float) = 2.0
+        _CloudDetailScale ("Detail Scale", Float) = 5.0
+        _CloudCoverageHorizon ("Coverage @ Horizon", Range(0,1)) = 0.40
+        _CloudCoverageZenith ("Coverage @ Zenith", Range(0,1)) = 0.66
+        _CloudSoftness ("Softness", Range(0.005,0.5)) = 0.16
+        _CloudErode ("Detail Erode", Range(0,1)) = 0.45
+        _CloudWindDir ("Wind Dir (xy)", Vector) = (1, 0.3, 0, 0)
+        _CloudWindSpeed ("Wind Speed", Float) = 0.004
+        _CloudBrightColor ("Cloud Bright", Color) = (0.973, 0.953, 0.882, 1)
+        _CloudMidColor ("Cloud Mid", Color) = (0.922, 0.890, 0.824, 1)
+        _CloudDarkColor ("Cloud Dark", Color) = (0.694, 0.745, 0.773, 1)
+        _CloudNightColor ("Cloud Night", Color) = (0.12, 0.14, 0.22, 1)
+        _CloudSunSide ("Sun Side Boost", Range(0,1)) = 0.35
+        _CloudMinY ("Min dir.y (anti-alias)", Range(0.01,0.4)) = 0.10
+        _CloudPerspective ("Perspective (0=贴天球, 1=平面投影)", Range(0,1)) = 0.45
+        _CloudHazeStart ("Haze Start (dir.y)", Range(0,0.5)) = 0.01
+        _CloudHazeEnd ("Haze End (dir.y)", Range(0,0.5)) = 0.16
+        _CloudHazeColor ("Haze Color", Color) = (0.78, 0.85, 0.97, 1)
     }
     SubShader
     {
@@ -147,6 +170,29 @@ Shader "Unlit/Skybox"
             float _SunsetRange;
             float _SunsetPower;
             float _AirMassHeight;
+
+            // ---- 天空球云层 ----
+            TEXTURE2D(_CloudTex);
+            SAMPLER(sampler_CloudTex);
+            float _CloudStrength;
+            float _CloudScale;
+            float _CloudDetailScale;
+            float _CloudCoverageHorizon;
+            float _CloudCoverageZenith;
+            float _CloudSoftness;
+            float _CloudErode;
+            float4 _CloudWindDir;
+            float _CloudWindSpeed;
+            float4 _CloudBrightColor;
+            float4 _CloudMidColor;
+            float4 _CloudDarkColor;
+            float4 _CloudNightColor;
+            float _CloudSunSide;
+            float _CloudMinY;
+            float _CloudPerspective;
+            float _CloudHazeStart;
+            float _CloudHazeEnd;
+            float4 _CloudHazeColor;
 
             // Henyey-Greenstein 相函数：描述 Mie 散射的方向性
             // g 越大散射越集中在前向 —— 这就是日出日落时太阳周围的 halo
@@ -344,6 +390,46 @@ Shader "Unlit/Skybox"
                 finalColor += sunGlow * sunCol * _SunGlowStrength;
                 finalColor += finalMoonColor;
                 finalColor += scatteringColor;
+
+                // ===== 天空球云层（平面投影）=====
+                // 把视线投影到虚拟的水平云平面：uv = dir.xz / dir.y
+                // 近地平线 dir.y -> 0，uv 迅速变大 -> 投影压缩 -> 云自动变密变小
+                {
+                    float cy = max(dir.y, _CloudMinY);
+                    // _CloudPerspective: 0 = 正交（云像贴在天球上，圆润、不拉伸，就是 cubemap 的观感）
+                    //                    1 = 平面投影（透视强，但 cot(仰角) 会把云拉成横向长条）
+                    // 因为有 _CloudMinY 兜底，半径天然有界，不会无限重复
+                    float inv = lerp(1.0, 1.0 / cy, _CloudPerspective);
+                    float2 cuv = dir.xz * inv * _CloudScale;
+                    cuv += _CloudWindDir.xy * _CloudWindSpeed * _Time.y;
+
+                    // 烘出来的云场：R = 密度(覆盖率)  G = 形体高度
+                    float4 cls = SAMPLE_TEXTURE2D(_CloudTex, sampler_CloudTex, cuv);
+
+                    // 覆盖率随仰角变化：地平线密、天顶疏（对齐参考图实测）
+                    float cov = lerp(_CloudCoverageHorizon, _CloudCoverageZenith, smoothstep(0.0, 0.80, dir.y));
+                    float d = smoothstep(cov, cov + _CloudSoftness, cls.r);
+
+                    // 伪高度直接用烘出来的形体（来自参考图的明暗），不再靠启发式猜
+                    float h = saturate(cls.g);
+
+                    float3 cc = lerp(_CloudDarkColor.rgb, _CloudMidColor.rgb, smoothstep(0.0, 0.42, h));
+                    cc = lerp(cc, _CloudBrightColor.rgb, smoothstep(0.42, 1.0, h));
+
+                    // 太阳侧受光 / 背阳侧压暗
+                    float cs = saturate(dot(dir, lightDir));
+                    cc = lerp(cc * (1.0 - _CloudSunSide * 0.5), cc, cs);
+
+                    // 贴地平线融入天空色（顺带压掉投影拉伸的走样）
+                    float chaze = 1.0 - smoothstep(_CloudHazeStart, _CloudHazeEnd, dir.y);
+                    cc = lerp(cc, _CloudHazeColor.rgb, chaze);
+
+                    // 昼夜
+                    cc *= lerp(_CloudNightColor.rgb, float3(1.0, 1.0, 1.0), sunNightStep);
+
+                    float cmask = d * _CloudStrength * smoothstep(_CloudHazeStart, _CloudHazeEnd, dir.y);
+                    finalColor = lerp(finalColor, cc, saturate(cmask));
+                }
 
                 // 应用雾效
                 finalColor = MixFog(finalColor, i.fogCoord);
