@@ -238,6 +238,7 @@ public static class CloudShapeBaker
         for (int i = 0; i < mp.Length; i++)
             mask[i] = hasA ? mp[i].a > 127
                            : (Mathf.Abs(mp[i].r - bg.r) + Mathf.Abs(mp[i].g - bg.g) + Mathf.Abs(mp[i].b - bg.b)) > 60;
+        mask = CleanSilhouette(mask, W, H, 6);
 
         int x0 = W, y0 = H, x1 = -1, y1 = -1;
         for (int y = 0; y < H; y++)
@@ -316,6 +317,7 @@ public static class CloudShapeBaker
                 ? mp[i].a > 127
                 : (Mathf.Abs(mp[i].r - bg.r) + Mathf.Abs(mp[i].g - bg.g) + Mathf.Abs(mp[i].b - bg.b)) > 60;
         }
+        mask = CleanSilhouette(mask, W, H, 6);
 
         // 2) bbox
         int x0 = W, y0 = H, x1 = -1, y1 = -1;
@@ -363,6 +365,86 @@ public static class CloudShapeBaker
         for (int i = 0; i < hgt.Length; i++) sh.height[i] = Mathf.Clamp01(hgt[i]) * sh.density[i];
 
         return sh;
+    }
+
+    /// <summary>
+    /// 清理剪影：闭运算（封住细通道）+ 填洞。
+    /// 参考图的剪影可能带细白通道或空洞（剪影_高大_V2 就有一块），
+    /// 直接拿去当 alpha 会让烘出来的云和图集里出现破洞。
+    /// </summary>
+    private static bool[] CleanSilhouette(bool[] m, int w, int h, int r)
+    {
+        var closed = Erode(Dilate(m, w, h, r), w, h, r);
+        var outside = new bool[m.Length];
+        var st = new Stack<int>();
+        for (int x = 0; x < w; x++)
+        {
+            if (!closed[x]) { outside[x] = true; st.Push(x); }
+            if (!closed[(h - 1) * w + x]) { outside[(h - 1) * w + x] = true; st.Push((h - 1) * w + x); }
+        }
+        for (int y = 0; y < h; y++)
+        {
+            if (!closed[y * w]) { outside[y * w] = true; st.Push(y * w); }
+            if (!closed[y * w + w - 1]) { outside[y * w + w - 1] = true; st.Push(y * w + w - 1); }
+        }
+        while (st.Count > 0)
+        {
+            int c = st.Pop(); int cy = c / w, cx = c - cy * w;
+            for (int d = 0; d < 4; d++)
+            {
+                int nx = cx + (d == 0 ? 1 : d == 1 ? -1 : 0);
+                int ny = cy + (d == 2 ? 1 : d == 3 ? -1 : 0);
+                if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+                int ni = ny * w + nx;
+                if (closed[ni] || outside[ni]) continue;
+                outside[ni] = true; st.Push(ni);
+            }
+        }
+        var res = new bool[m.Length];
+        for (int i = 0; i < res.Length; i++) res[i] = !outside[i];
+        return res;
+    }
+
+    private static bool[] Dilate(bool[] m, int w, int h, int r)
+    {
+        var t = new bool[m.Length];
+        for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+        {
+            bool v = false;
+            for (int d = -r; d <= r && !v; d++) { int nx = x + d; if (nx < 0 || nx >= w) continue; if (m[y * w + nx]) v = true; }
+            t[y * w + x] = v;
+        }
+        var o = new bool[m.Length];
+        for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+        {
+            bool v = false;
+            for (int d = -r; d <= r && !v; d++) { int ny = y + d; if (ny < 0 || ny >= h) continue; if (t[ny * w + x]) v = true; }
+            o[y * w + x] = v;
+        }
+        return o;
+    }
+
+    private static bool[] Erode(bool[] m, int w, int h, int r)
+    {
+        var t = new bool[m.Length];
+        for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+        {
+            bool v = true;
+            for (int d = -r; d <= r && v; d++) { int nx = x + d; if (nx < 0 || nx >= w) continue; if (!m[y * w + nx]) v = false; }
+            t[y * w + x] = v;
+        }
+        var o = new bool[m.Length];
+        for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+        {
+            bool v = true;
+            for (int d = -r; d <= r && v; d++) { int ny = y + d; if (ny < 0 || ny >= h) continue; if (!t[ny * w + x]) v = false; }
+            o[y * w + x] = v;
+        }
+        return o;
     }
 
     private static float[] Blur(float[] a, int w, int h)
